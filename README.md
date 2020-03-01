@@ -13,7 +13,7 @@ Register a network:
 [oneadmin@one01 GetAutoNet]$ ./register_address_range register-address-range.xml
 
                 AR = [
-                    IPAM_MAD = "ipa-nmap",
+                    IPAM_MAD = "GetAutoNet",
                     TYPE = "IP4",
                     IP   = "10.0.0.100",
                     SIZE = "155",
