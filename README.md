@@ -7,6 +7,9 @@ IP's or ranges of IP's returned are not allocated to offline machines.
 
 # Runtime
 
+Register a network:
+
+```
 [oneadmin@one01 GetAutoNet]$ ./register_address_range register-address-range.xml
 
                 AR = [
@@ -23,8 +26,11 @@ IP's or ranges of IP's returned are not allocated to offline machines.
                 ]
 
 [oneadmin@one01 GetAutoNet]$
+```
 
+Get single IP address:
 
+```
 [oneadmin@one01 GetAutoNet]$ ./get_single get-single-address.xml
 
             AR = [
@@ -33,6 +39,7 @@ IP's or ranges of IP's returned are not allocated to offline machines.
             ]
 
 [oneadmin@one01 GetAutoNet]$
+```
 
 Sample input file:
 
