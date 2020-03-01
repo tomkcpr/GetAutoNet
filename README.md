@@ -5,6 +5,7 @@ The returned free IP list is checked against a defined list of DNS servers to en
 IP's or ranges of IP's returned are not allocated to offline machines.
 
 
+# Runtime
 
 [oneadmin@one01 GetAutoNet]$ ./register_address_range register-address-range.xml
 
@@ -82,6 +83,22 @@ Sample input file:
         </ADDRESS>
         </IPAM_DRIVER_ACTION_DATA>
 [oneadmin@one01 GetAutoNet]$
+```
+
+# RPM Build Notes
+
+To modify the code and roll your own RPM, first pull the repo down:
+
+```
+git clone https://github.com/tomkcpr/GetAutoNet.git
+```
+
+then simply issue the following ```rpmbuild``` commands:
+
+```
+[root@one01 SPECS]# pwd
+/root/GetAutoNet/rpmbuild/SPECS
+[root@one01 SPECS]# rpmbuild --target noarch -bb GetAutoNet.spec
 ```
 
 Cheers!
