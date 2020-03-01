@@ -1,6 +1,6 @@
 # GetAutoNet
 
-GetAutoNet is a IP and IP range discovery tool for OpenNebula using nmap.
+GetAutoNet is a IP range discovery tool for ON using nmap.
 The returned free IP list is checked against a defined list of DNS servers to ensure
 IP's or ranges of IP's returned are not allocated to offline machines.
 
