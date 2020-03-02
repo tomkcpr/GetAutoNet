@@ -10,7 +10,7 @@ IP's or ranges of IP's returned are not allocated to offline machines.
 Register a network:
 
 ```
-[oneadmin@one01 GetAutoNet]$ ./register_address_range register-address-range.xml
+$ ./register_address_range register-address-range.xml
 
                 AR = [
                     IPAM_MAD = "GetAutoNet",
@@ -25,26 +25,26 @@ Register a network:
                     OTHER_IPAM_ATTR   = "private.xyz.dom"
                 ]
 
-[oneadmin@one01 GetAutoNet]$
+$
 ```
 
 Get single IP address:
 
 ```
-[oneadmin@one01 GetAutoNet]$ ./get_single get-single-address.xml
+$ ./get_single get-single-address.xml
 
             AR = [
                 IP  = "10.0.0.100",
                 SIZE = "1"
             ]
 
-[oneadmin@one01 GetAutoNet]$
+$
 ```
 
 Sample input file:
 
 ```
-[oneadmin@one01 GetAutoNet]$ cat register-address-range.xml
+$ cat register-address-range.xml
         <IPAM_DRIVER_ACTION_DATA>
         <AR>
           <TYPE>IP4</TYPE>
@@ -61,13 +61,13 @@ Sample input file:
           <UPPER_LIMIT>255</UPPER_LIMIT>
         </AR>
         </IPAM_DRIVER_ACTION_DATA>
-[oneadmin@one01 GetAutoNet]$
+$
 ```
 
 
 
 ```
-[oneadmin@one01 GetAutoNet]$ cat allocate-address-range.xml
+$ cat allocate-address-range.xml
         <IPAM_DRIVER_ACTION_DATA>
         <AR>
           <TYPE>IP4</TYPE>
@@ -89,7 +89,7 @@ Sample input file:
           <MAC>AA:BB:CC:DD:EE:FF:01:01</MAC>
         </ADDRESS>
         </IPAM_DRIVER_ACTION_DATA>
-[oneadmin@one01 GetAutoNet]$
+$
 ```
 
 # RPM Build Notes
@@ -109,3 +109,4 @@ then simply issue the following ```rpmbuild``` commands:
 ```
 
 Cheers!
+TK
