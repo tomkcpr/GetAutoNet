@@ -30,7 +30,8 @@ exit
 %files
 %attr(0750, oneadmin, oneadmin) /var/lib/one/remotes/ipam/GetAutoNet/*.py
 %attr(0640, oneadmin, oneadmin) /var/lib/one/remotes/ipam/GetAutoNet/*.xml
-%attr(0640, oneadmin, oneadmin) /var/log/GetAutoNet
+%attr(0750, oneadmin, oneadmin) /var/lib/one/remotes/ipam/GetAutoNet
+%attr(0750, oneadmin, oneadmin) /var/log/GetAutoNet
 
 %pre
 
@@ -46,6 +47,7 @@ if [[ $? == 0 ]]; then
     ln -s GetAutoNet.py unregister_address_range
     ln -s GetAutoNet.py register_address_range
     chown oneadmin.oneadmin -h get_single free_address get_address allocate_address unregister_address_range register_address_range *.py *.xml
+    chmod 640 /var/lib/one/remotes/ipam/GetAutoNet/*.xml
 fi
 
 %postun

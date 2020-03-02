@@ -1,5 +1,23 @@
 #!/bin/python3
 
+# --------------------------------------------------------------------------------------
+# Copyright (C) 2020  Tom Kacperski ( tomkcpr AT mdevsys DOT com )
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+# --------------------------------------------------------------------------------------
+
 
 # [ register_address_range ]
 
@@ -170,6 +188,8 @@ import socket
 import dns.resolver
 
 import inspect
+import base64
+import binascii
 
 # print(inspect.getfile(nmap))
 # print(nmap.__file__)
@@ -279,8 +299,69 @@ class GetAutoNet():
         return self.dnschklst
 
 
+    # Check if passed string is base64: https://stackoverflow.com/questions/12315398/check-if-a-string-is-encoded-in-base64-using-python
+    def isBase64(self,sb):
+        try:
+            if isinstance(sb, str):
+            # If there's any unicode here, an exception will be thrown and the function will return false
+                sb_bytes = bytes(sb, 'ascii')
+            elif isinstance(sb, bytes):
+                sb_bytes = sb
+            else:
+                raise ValueError("Argument must be string or bytes")
+
+            return base64.b64encode(base64.b64decode(sb_bytes)) == sb_bytes
+
+        except Exception:
+                return False
+
+
+    # Scan a VLAN and provide IP(s).
     def getAddress(self):
-        xmltree = et.parse(sys.argv[1]);
+        xmlBase64 = ""
+        xmlFile = ""
+        xmlMsg = ""
+
+        # print("self.isBase64(): ", self.isBase64(sys.argv[1]) )
+        # print("base64.b64decode(): ", base64.b64decode(sys.argv[1]) )
+
+
+
+        # Check if parameter passed is a base64 encoded xml message.  Decode it.
+        if self.isBase64(sys.argv[1]):
+            xmlBase64 = base64.b64decode(sys.argv[1])
+
+        # Check if parameter is plain text xml.  
+        elif re.search(r'SIZE', sys.argv[1]) and re.search(r'IPAM_DRIVER_ACTION_DATA', sys.argv[1]) and re.search(r'IPAM_MAD', sys.argv[1]):
+            xmlMsg = sys.argv[1]
+
+        # Check if parameter is a regular file.
+        elif os.access(sys.argv[1],os.R_OK):
+            xmlFile = sys.argv[1]
+
+        # Exit when unknown parameter format is passed.
+        else:
+            print("ERROR: sys.argv[1] is neither a file, base64 encoded string nor a plain readable file.  Exiting.")
+            sys.exit(1)
+
+
+        # Get definition from an .xml file.
+        if xmlFile != "":
+            xmltree = et.parse(sys.argv[1]);
+
+        # Get definition from a base64 encoded message.        
+        if xmlBase64 != "":
+            xmltree = et.fromstring(xmlBase64)
+
+        # Get definition from the argument direcctly.
+        if xmlMsg != "":
+            xmltree = et.fromstring(xmlMsg)
+
+        # print("xmltree: ", xmltree)
+
+
+
+
         # print ("todayDateTime: ", self.todayDateTime)
 
         # XML Tree Item = xti
@@ -300,6 +381,8 @@ class GetAutoNet():
 
             if xti.find('NETWORK_MASK') is not None:
                 self.network_mask = xti.find('NETWORK_MASK').text
+            else:
+                self.network_mask = "255.255.255.0"
 
             if xti.find('GATEWAY') is not None:
                 self.gateway = xti.find('GATEWAY').text
@@ -321,22 +404,30 @@ class GetAutoNet():
 
 
         # Set the DNS list to check against.
-        dnslst = list(xti.find('DNS').text.split(" "))
+        if xti.find('DNS') is not None and xti.find('DNS') != "":
+            dnslst = list(xti.find('DNS').text.split(" "))
+        else:
+            print("ERROR: DNS list cannot be empty.")
+            sys.exit(1)
+
+        # print("dnslst: ", dnslst)
 
 
         # XML Tree Item = xti
         for xti in xmltree.iter('ADDRESS'):
-            if xti.find('IP') is not None: 
+            if xti.find('IP') is not None and not re.search(r'None', str(xti.find('IP').text)): 
                 self.net_ip = xti.find('IP').text
 
-            if xti.find('SIZE') is not None:
+            if xti.find('SIZE') is not None and not re.search(r'None', str(xti.find('SIZE').text)):
                 self.net_size = int(xti.find('SIZE').text)
 
-            if xti.find('MAC') is not None:
+            if xti.find('MAC') is not None and not re.search(r'None', str(xti.find('MAC').text)):
                 self.net_mac = xti.find('MAC').text
 
 
         # print("self.net_ip: %s, self.net_size: %s, self.net_mac: %s" % (self.net_ip, self.net_size, self.net_mac))
+        # print("self.network_address: ", self.network_address)
+        # print("self.network_mask: ", self.network_mask)
 
         #     print ("[*] Network Address: ", self.network_address)
         #     print ("[*] Network Mask: ", self.network_mask)
@@ -432,6 +523,7 @@ class GetAutoNet():
         # Retrieve the network from the XML Network Address.
         network = "".join(re.split(r'(\.|/)', self.network_address)[0:-2])
 
+        # Find largest contigous IP set.
         for x in range(len(self.dnschklst)):
 
             # Retrieve hostid of the VLAN IP
@@ -515,7 +607,9 @@ class GetAutoNet():
 
         if brief == 0:
 
-            rangeArgs = {'arg1':"ipa-nmap", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':ranges, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
+            # print("lrange: ", lrange)
+
+            rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':ranges, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
 
             # print(rangeArgs)
 
@@ -544,7 +638,7 @@ class GetAutoNet():
                 return -1
 
             # Set the AR STDOUT
-            rangeArgs = {'arg1':"ipa-nmap", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':self.net_size, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
+            rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':self.net_size, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
 
             # print (rangeArgs)
 
