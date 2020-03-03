@@ -108,5 +108,6 @@ then simply issue the following ```rpmbuild``` commands:
 [root@one01 SPECS]# rpmbuild --target noarch -bb GetAutoNet.spec
 ```
 
+Further details available at https://www.mdevsys.com/wp/
+
 Cheers!
-TK
