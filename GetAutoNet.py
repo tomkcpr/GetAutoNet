@@ -215,8 +215,8 @@ class GetAutoNet():
     dns=""
     guest_mtu=""
     search_domain=""
-    lowerLimit=1
-    upperLimit=254
+    lowerLimit=""           # Default set to 1 further down in the code.
+    upperLimit=""           # Default set to 254 further down in the code.
 
     # [AR] XML input variables.
     net_ip=""
@@ -238,8 +238,12 @@ class GetAutoNet():
         return sum([bin(int(x)).count('1') for x in netmask.split('.')])
 
     def nmapScan(self, vlan, netmask):
+
         # NMAP VLAN to determine IP availability.
-        # print ("NMAP Scanner")
+        # print ("nmapScan(self, vlan, netmask)")
+        # print ("vlan: ", vlan)
+        # print ("netmask: ", netmask)
+
         nm = nmap.PortScanner ()
 
         cidr=ipaddress.IPv4Network('0.0.0.0/' + netmask).prefixlen
@@ -266,7 +270,7 @@ class GetAutoNet():
                     # print ("Exception Encountered: ", listexc)
                     continue
 
-        # print (self.finlst)
+        # print ("self.finlst: ", self.finlst)
 
         if self.log:
             with open("/var/log/GetAutoNet/GetAutoNet.log", "a") as f:
@@ -275,9 +279,15 @@ class GetAutoNet():
 
 
     def dnsLookup(self):
+        # print("dnsLookup(self): ")
     
         dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
         dns.resolver.default_resolver.nameservers = self.dnslst
+
+        # Check that self.finlst is not empty.  Quit otherwise.
+        # print("self.finlst: ", self.finlst)
+        if not self.finlst:
+            print("ERROR: self.finlst was empty.  This indicates that the nmap scanned failed or returned no results.  Sometimes this is due to missing parameters, such as NETWORK_ADDRESS or NETWORK_MASK not being set.  This is needed by nmap.  Please check the Advanced Section and Custom Attribute Key/Value pairs for the Virtual Network.")
 
         for x in range(len(self.finlst)):
             # print("DNS.  PTR of: ", self.finlst[x][0])
@@ -396,11 +406,49 @@ class GetAutoNet():
             if xti.find('SEARCH_DOMAIN') is not None:
                 self.search_domain = xti.find('SEARCH_DOMAIN').text
 
+
             if xti.find('LOWER_LIMIT') is not None:
-                self.lowerLimit = int(xti.find('LOWER_LIMIT').text)
+                try:
+                    self.lowerLimit = int(xti.find('LOWER_LIMIT').text)
+                except Exception as e:
+                    # print("[E - LL]")
+                    pass
+
+                if self.lowerLimit == "":
+                    try:
+                        self.lowerLimit = int(re.split(r'(\.|/)', xti.find('LOWER_LIMIT').text)[-1])
+                    except Exception as e:
+                        print("ERROR: LOWER_LIMIT needs to be an integer.  For example, instead of using 10.0.0.100, enter 100. If you did enter something else other then a valid IP, please try to reenter the parameter.  Value %s cannot be parsed. " % ( xti.find('LOWER_LIMIT').text ) )
+                        sys.exit(1)
+
+                # print("(s)lowerLimit: ", self.lowerLimit)
+
 
             if xti.find('UPPER_LIMIT') is not None:
-                self.upperLimit = int(xti.find('UPPER_LIMIT').text)
+                try:
+                    self.upperLimit = int(xti.find('UPPER_LIMIT').text)
+                except Exception as e:
+                    # print("[E - UL]")
+                    pass
+
+                if self.upperLimit == "":
+                    try: 
+                        self.upperLimit = int(re.split(r'(\.|/)', xti.find('UPPER_LIMIT').text)[-1])
+                    except Exception as e:
+                        print("ERROR: UPPER_LIMIT needs to be an integer.  For example, instead of using 10.0.0.255, enter 255. If you did enter something else other then a valid IP, please try to reenter the parameter.  Value %s cannot be parsed. " % ( xti.find('UPPER_LIMIT').text ) )
+                        sys.exit(1)
+
+                # print("(s)upperLimit: ", self.upperLimit)
+
+        # print("(f)lowerLimit: ", self.lowerLimit)
+        # print("(f)upperLimit: ", self.upperLimit)
+
+
+        # If we're not able to find any set limits, define defaults.
+        if self.lowerLimit == "":
+            self.lowerLimit = 1
+        if self.upperLimit == "":
+            self.upperLimit = 254
 
 
         # Set the DNS list to check against.
@@ -523,6 +571,12 @@ class GetAutoNet():
         # Retrieve the network from the XML Network Address.
         network = "".join(re.split(r'(\.|/)', self.network_address)[0:-2])
 
+        # Check if a valid dnschklst exists.
+        # print("self.dnschklst: ", self.dnschklst)
+        if not self.dnschklst:
+            print("ERROR: self.dnschklst was empty.  This either indicates that no IP's were available on this network or a different problem existed further in the code.  Please check your input parameters and retry. ")
+            sys.exit(1)
+
         # Find largest contigous IP set.
         for x in range(len(self.dnschklst)):
 
@@ -546,6 +600,7 @@ class GetAutoNet():
 
             # Save range, if next IP is 2 or greater then we have a range. Save it. 
             # print ("rangestart: %s, rangeend: %s, hostid: %s, x: %s, len(self.dnschklst): %s, lowerLimit: %s, upperLimit: %s" % ( rangestart, rangeend, hostid, x, len(self.dnschklst), self.lowerLimit, self.upperLimit ) )
+
             if ( hostid - rangeend ) >= 2 or x == len(self.dnschklst) - 1: 
 
                 # If even some of the range is within limits in XML, continue to add the range.
@@ -573,6 +628,10 @@ class GetAutoNet():
 
 
         # print("rangelst: ", rangelst)
+
+        if not rangelst:
+            print("ERROR: rangelst = [] is empty.  No range was found or something else went wrong causing this.")
+            sys.exit(1)
 
         # Return largest range found.
         lrange=0
@@ -607,11 +666,13 @@ class GetAutoNet():
 
         if brief == 0:
 
-            # print("lrange: ", lrange)
+            print("lrange: ", lrange)
+            print("lowerLimit: ", self.lowerLimit)
+            print("upperLimit: ", self.upperLimit)
 
             rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':ranges, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
 
-            # print(rangeArgs)
+            print(rangeArgs)
 
             ARString = '''
                 AR = [
@@ -642,7 +703,7 @@ class GetAutoNet():
 
             # print (rangeArgs)
 
-            ARString = '''AR = [ IP   = "{arg3}", SIZE = "{arg4}" ]'''.format(**rangeArgs)
+            ARString = '''AR = [ IP = "{arg3}", SIZE = "{arg4}" ]'''.format(**rangeArgs)
 
             # Print OpenNebula formatted IP.
             print(ARString)
