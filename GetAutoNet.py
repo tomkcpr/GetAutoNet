@@ -215,8 +215,8 @@ class GetAutoNet():
     dns=""
     guest_mtu=""
     search_domain=""
-    lowerLimit=""
-    upperLimit=""
+    lowerLimit=1
+    upperLimit=254
 
     # [AR] XML input variables.
     net_ip=""
@@ -545,7 +545,7 @@ class GetAutoNet():
 
 
             # Save range, if next IP is 2 or greater then we have a range. Save it. 
-            # print ("rangestart: %s, rangeend: %s, hostid: %s, x: %s, len(self.dnschklst): %s" % ( rangestart, rangeend, hostid, x, len(self.dnschklst) ) )
+            # print ("rangestart: %s, rangeend: %s, hostid: %s, x: %s, len(self.dnschklst): %s, lowerLimit: %s, upperLimit: %s" % ( rangestart, rangeend, hostid, x, len(self.dnschklst), self.lowerLimit, self.upperLimit ) )
             if ( hostid - rangeend ) >= 2 or x == len(self.dnschklst) - 1: 
 
                 # If even some of the range is within limits in XML, continue to add the range.
