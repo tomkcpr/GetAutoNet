@@ -666,9 +666,9 @@ class GetAutoNet():
 
         if brief == 0:
 
-            print("lrange: ", lrange)
-            print("lowerLimit: ", self.lowerLimit)
-            print("upperLimit: ", self.upperLimit)
+            # print("lrange: ", lrange)
+            # print("lowerLimit: ", self.lowerLimit)
+            # print("upperLimit: ", self.upperLimit)
 
             rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':ranges, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
 
