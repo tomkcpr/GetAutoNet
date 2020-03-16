@@ -108,5 +108,8 @@ then simply issue the following ```rpmbuild``` commands:
 [root@one01 SPECS]# rpmbuild --target noarch -bb GetAutoNet.spec
 ```
 
+Further details available at https://www.mdevsys.com/wp/
+
+Detailed instructions available at: https://microdevsys.com/wp/getautonet-automatic-ip-range-vlan-segment-discovery-tool/
+
 Cheers!
-TK
