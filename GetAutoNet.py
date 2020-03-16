@@ -198,6 +198,7 @@ import xml.dom.minidom, xml.etree.ElementTree as et
 import re
 
 class GetAutoNet():
+    logFile="/var/log/GetAutoNet/GetAutoNet.log"
     ipAddress=""
     todayDateTime = dt.today()
     dnslst = []
@@ -223,12 +224,23 @@ class GetAutoNet():
     net_size=""
     net_mac=""
 
+    def logmsg(self, msg):
+        if self.log:
+            with open(self.logFile, "a") as f:
+                f.write (str(msg) + "\n")
+
     def __init__(self):
         self.ipAddress = ""
 
     def __init__(self, log):
         self.ipAddress = ""
         self.log = log
+        log.setLevel(logging.DEBUG)
+        fh = logging.FileHandler(self.logFile)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        log.addHandler(fh)
+
 
     def tocidr(self, netmask):
         '''
@@ -240,9 +252,9 @@ class GetAutoNet():
     def nmapScan(self, vlan, netmask):
 
         # NMAP VLAN to determine IP availability.
-        # print ("nmapScan(self, vlan, netmask)")
-        # print ("vlan: ", vlan)
-        # print ("netmask: ", netmask)
+        self.logmsg("nmapScan(self, vlan, netmask)")
+        self.logmsg("vlan: " + vlan)
+        self.logmsg("netmask: " + netmask)
 
         nm = nmap.PortScanner ()
 
@@ -250,11 +262,9 @@ class GetAutoNet():
         # print ("cidr: ", cidr);
 
         try:
-            # print ("Running nm.scan ... ", vlan, netmask)
+            self.logmsg("Running nm.scan ... vlan(%s), netmask(%s) \n" % ( vlan, netmask) )
             raw = nm.scan(hosts=vlan+'/'+str(cidr), arguments=' -v -sn -n ')
         except Exception as e:
-            # See: https://www.programcreek.com/python/example/92225/nmap.PortScanner
-            # console('OSdetect', vlan, 'None\n') 
             logging.exception(e)
 
         for a, b in raw.get('scan').items():
@@ -270,24 +280,22 @@ class GetAutoNet():
                     # print ("Exception Encountered: ", listexc)
                     continue
 
-        # print ("self.finlst: ", self.finlst)
+        self.logmsg("self.finlst: %s" % (self.finlst))
 
-        if self.log:
-            with open("/var/log/GetAutoNet/GetAutoNet.log", "a") as f:
-                f.write ("Finished scanning " + str(dt.now()) + "\n")
+        self.logmsg("Finished scanning " + str(dt.now()) + "\n")
         return self.finlst                       # returns a list
 
 
     def dnsLookup(self):
-        # print("dnsLookup(self): ")
+        self.logmsg("dnsLookup(self): ")
     
         dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
         dns.resolver.default_resolver.nameservers = self.dnslst
 
         # Check that self.finlst is not empty.  Quit otherwise.
-        # print("self.finlst: ", self.finlst)
+        self.logmsg("self.finlst: " + str(self.finlst))
         if not self.finlst:
-            print("ERROR: self.finlst was empty.  This indicates that the nmap scanned failed or returned no results.  Sometimes this is due to missing parameters, such as NETWORK_ADDRESS or NETWORK_MASK not being set.  This is needed by nmap.  Please check the Advanced Section and Custom Attribute Key/Value pairs for the Virtual Network.")
+            self.logmsg("ERROR: self.finlst was empty.  This indicates that the nmap scanned failed or returned no results.  Sometimes this is due to missing parameters, such as NETWORK_ADDRESS or NETWORK_MASK not being set.  This is needed by nmap.  Please check the Advanced Section and Custom Attribute Key/Value pairs for the Virtual Network.\n")
 
         for x in range(len(self.finlst)):
             # print("DNS.  PTR of: ", self.finlst[x][0])
@@ -311,6 +319,7 @@ class GetAutoNet():
 
     # Check if passed string is base64: https://stackoverflow.com/questions/12315398/check-if-a-string-is-encoded-in-base64-using-python
     def isBase64(self,sb):
+        self.logmsg("isBase64(self,sb): ")
         try:
             if isinstance(sb, str):
             # If there's any unicode here, an exception will be thrown and the function will return false
@@ -328,18 +337,28 @@ class GetAutoNet():
 
     # Scan a VLAN and provide IP(s).
     def getAddress(self):
+        self.logmsg("getAddress(self):")
         xmlBase64 = ""
         xmlFile = ""
         xmlMsg = ""
 
-        # print("self.isBase64(): ", self.isBase64(sys.argv[1]) )
-        # print("base64.b64decode(): ", base64.b64decode(sys.argv[1]) )
 
+        self.logmsg("self.isBase64(): " + str(self.isBase64(sys.argv[1])) )
+        if self.isBase64(sys.argv[1]):
+            self.logmsg("base64.b64decode(): " )
+            self.logmsg(base64.b64decode(str(sys.argv[1])))
 
 
         # Check if parameter passed is a base64 encoded xml message.  Decode it.
         if self.isBase64(sys.argv[1]):
             xmlBase64 = base64.b64decode(sys.argv[1])
+                
+            # Log the base64 encoded string.
+            self.logmsg ("base64 encoded string:" + sys.argv[1] + "\n")
+
+            # Log the base64 decoded string.
+            self.logmsg ("base64 decoded string:" + str(xmlBase64) + "\n")
+
 
         # Check if parameter is plain text xml.  
         elif re.search(r'SIZE', sys.argv[1]) and re.search(r'IPAM_DRIVER_ACTION_DATA', sys.argv[1]) and re.search(r'IPAM_MAD', sys.argv[1]):
@@ -351,7 +370,7 @@ class GetAutoNet():
 
         # Exit when unknown parameter format is passed.
         else:
-            print("ERROR: sys.argv[1] is neither a file, base64 encoded string nor a plain readable file.  Exiting.")
+            self.logmsg("ERROR: sys.argv[1] is neither a file, base64 encoded string nor a plain readable file.  Exiting.\n")
             sys.exit(1)
 
 
@@ -379,69 +398,86 @@ class GetAutoNet():
 
             if xti.find('IP') is not None: 
                 self.first_ip = xti.find('IP').text
+            else:
+                self.logmsg("WARNING(AR): IP was empty.  self.first_ip = (" + self.first_ip + ")\n")
 
             if xti.find('MAC') is not None:
                 self.first_mac = xti.find('MAC').text
+            else:
+                self.logmsg("WARNING(AR): MAC was empty.  self.first_mac = (" + self.first_mac + ")\n")
 
             if xti.find('SIZE') is not None:
                 self.network_size = xti.find('SIZE').text
+            else:
+                self.logmsg("WARNING(AR): SIZE was empty.  self.network_size = (" + self.network_size + ")\n")
 
             if xti.find('NETWORK_ADDRESS') is not None:
                 self.network_address = xti.find('NETWORK_ADDRESS').text
+            else:
+                self.logmsg("WARNING(AR): NETWORK_ADDRESS was empty.  self.network_address = (" + self.network_address + ")\n")
 
             if xti.find('NETWORK_MASK') is not None:
                 self.network_mask = xti.find('NETWORK_MASK').text
             else:
+                self.logmsg("WARNING(AR): NETWORK_MASK was empty.  self.NETWORK_MASK = (" + self.network_mask + "). Setting to default of 255.255.255.0 \n")
                 self.network_mask = "255.255.255.0"
 
             if xti.find('GATEWAY') is not None:
                 self.gateway = xti.find('GATEWAY').text
+            else:
+                self.logmsg("WARNING(AR): GATEWAY was empty.  self.gateway = (" + self.gateway + ")\n")
             
             if xti.find('DNS') is not None:
                 self.dns = xti.find('DNS').text
+            else:
+                self.logmsg("WARNING(AR): DNS was empty.  self.dns = (" + self.dns + ")\n")
 
             if xti.find('GUEST_MTU') is not None:
                 self.guest_mtu = xti.find('GUEST_MTU').text
+            else:
+                self.logmsg("WARNING(AR): GUEST_MTU was empty.  self.guest_mtu = (" + self.guest_mtu + ")\n")
 
             if xti.find('SEARCH_DOMAIN') is not None:
                 self.search_domain = xti.find('SEARCH_DOMAIN').text
+            else:
+                self.logmsg("WARNING(AR): SEARCH_DOMAIN was empty.  self.search_domain = (" + self.search_domain + ")\n")
 
 
             if xti.find('LOWER_LIMIT') is not None:
                 try:
                     self.lowerLimit = int(xti.find('LOWER_LIMIT').text)
                 except Exception as e:
-                    # print("[E - LL]")
+                    self.logmsg("LOWER_LIMIT: [E - LL]")
                     pass
 
                 if self.lowerLimit == "":
                     try:
                         self.lowerLimit = int(re.split(r'(\.|/)', xti.find('LOWER_LIMIT').text)[-1])
                     except Exception as e:
-                        print("ERROR: LOWER_LIMIT needs to be an integer.  For example, instead of using 10.0.0.100, enter 100. If you did enter something else other then a valid IP, please try to reenter the parameter.  Value %s cannot be parsed. " % ( xti.find('LOWER_LIMIT').text ) )
+                        self.logmsg("ERROR: LOWER_LIMIT needs to be an integer.  For example, instead of using 10.0.0.100, enter 100. If you did enter something else other then a valid IP, please try to reenter the parameter.  Value %s cannot be parsed. " % ( xti.find('LOWER_LIMIT').text ))
                         sys.exit(1)
 
-                # print("(s)lowerLimit: ", self.lowerLimit)
+                self.logmsg("(s)lowerLimit: " + str(self.lowerLimit))
 
 
             if xti.find('UPPER_LIMIT') is not None:
                 try:
                     self.upperLimit = int(xti.find('UPPER_LIMIT').text)
                 except Exception as e:
-                    # print("[E - UL]")
+                    self.logmsg("UPPER_LIMIT: [E - UL]")
                     pass
 
                 if self.upperLimit == "":
                     try: 
                         self.upperLimit = int(re.split(r'(\.|/)', xti.find('UPPER_LIMIT').text)[-1])
                     except Exception as e:
-                        print("ERROR: UPPER_LIMIT needs to be an integer.  For example, instead of using 10.0.0.255, enter 255. If you did enter something else other then a valid IP, please try to reenter the parameter.  Value %s cannot be parsed. " % ( xti.find('UPPER_LIMIT').text ) )
+                        self.logmsg("ERROR: UPPER_LIMIT needs to be an integer.  For example, instead of using 10.0.0.255, enter 255. If you did enter something else other then a valid IP, please try to reenter the parameter.  Value %s cannot be parsed. " % ( xti.find('UPPER_LIMIT').text ))
                         sys.exit(1)
 
-                # print("(s)upperLimit: ", self.upperLimit)
+                self.logmsg("(s)upperLimit: " + str(self.upperLimit))
 
-        # print("(f)lowerLimit: ", self.lowerLimit)
-        # print("(f)upperLimit: ", self.upperLimit)
+        self.logmsg("(f)lowerLimit: " + str(self.lowerLimit))
+        self.logmsg("(f)upperLimit: " + str(self.upperLimit))
 
 
         # If we're not able to find any set limits, define defaults.
@@ -455,43 +491,49 @@ class GetAutoNet():
         if xti.find('DNS') is not None and xti.find('DNS') != "":
             dnslst = list(xti.find('DNS').text.split(" "))
         else:
-            print("ERROR: DNS list cannot be empty.")
+            self.logmsg("ERROR: DNS list cannot be empty.")
             sys.exit(1)
 
-        # print("dnslst: ", dnslst)
+        self.logmsg("dnslst: " + str(dnslst))
 
 
         # XML Tree Item = xti
         for xti in xmltree.iter('ADDRESS'):
             if xti.find('IP') is not None and not re.search(r'None', str(xti.find('IP').text)): 
                 self.net_ip = xti.find('IP').text
+            else:
+                self.logmsg("WARNING(ADDRESS): IP was empty.  self.net_ip = (" + self.net_ip + ")\n")
 
             if xti.find('SIZE') is not None and not re.search(r'None', str(xti.find('SIZE').text)):
                 self.net_size = int(xti.find('SIZE').text)
+            else:
+                self.logmsg("WARNING(ADDRESS): SIZE was empty.  self.net_size = (" + self.net_size + ")\n")
 
             if xti.find('MAC') is not None and not re.search(r'None', str(xti.find('MAC').text)):
                 self.net_mac = xti.find('MAC').text
+            else:
+                self.logmsg("WARNING(ADDRESS): MAC was empty.  self.net_mac = (" + self.net_mac + ")\n")
 
 
-        # print("self.net_ip: %s, self.net_size: %s, self.net_mac: %s" % (self.net_ip, self.net_size, self.net_mac))
-        # print("self.network_address: ", self.network_address)
-        # print("self.network_mask: ", self.network_mask)
+        self.logmsg("self.net_ip: %s, self.net_size: %s, self.net_mac: %s" % (self.net_ip, self.net_size, self.net_mac))
+        self.logmsg("self.network_address: " + self.network_address)
+        self.logmsg("self.network_mask: " + self.network_mask)
 
-        #     print ("[*] Network Address: ", self.network_address)
-        #     print ("[*] Network Mask: ", self.network_mask)
-        #     print ("[*] Gateway: ", self.gateway)
-        #     print ("[*] DNS: ", self.dns)
-        #     print ("[*] Guest MTU: ", self.guest_mtu)
-        #     print ("[*] Search Domain: ", self.search_domain)
+        self.logmsg("[*] Network Address: " + self.network_address)
+        self.logmsg("[*] Network Mask: " + self.network_mask)
+        self.logmsg("[*] Gateway: " + self.gateway)
+        self.logmsg("[*] DNS: " + self.dns)
+        self.logmsg("[*] Guest MTU: " + self.guest_mtu)
+        self.logmsg("[*] Search Domain: " + self.search_domain)
 
-        # print ("[*] DNSLST: ", dnslst) 
+        self.logmsg("[*] DNSLST: " + str(dnslst)) 
 
         # Run NMAP scan of the subnet.
         finlst = self.nmapScan(self.network_address, self.network_mask)
 
         # CIDR Conversion Test
         cidr = self.tocidr("255.255.128.0")
-        # print ("CIDR: ", cidr)
+        self.logmsg("CIDR: " + str(cidr))
 
         # Check list of IP's for corresponding DNS entries.  Return free list.
         dnschklst = self.dnsLookup()
@@ -501,7 +543,7 @@ class GetAutoNet():
 
     # Get the first available IP off the list.
     def getsingle(self):
-        # print("def getsingle(): ")
+        self.logmsg("def getsingle(): ")
 
         # Retrieve the network from the XML Network Address.
         network = "".join(re.split(r'(\.|/)', self.network_address)[0:-2])
@@ -514,7 +556,7 @@ class GetAutoNet():
         for x in range(len(self.dnschklst)):
             
             # Retrieve hostid of the VLAN IP
-            # print("IP: ", self.dnschklst[x][0])
+            self.logmsg("IP: " + self.dnschklst[x][0])
             hostid = int(re.split(r'(\.|/)', self.dnschklst[x][0])[-1])
 
             # Initialize start of range if empty.
@@ -533,12 +575,12 @@ class GetAutoNet():
 
             # If the IP is greater then the upper limit specified, return -1 since we can't allocate any IP's.
             if selectip > self.upperLimit:
-                # print("Returning from function: ")
+                self.logmsg("Returning from function: ")
                 return -1
 
         rangeArgs = {'arg1':network + "." + str(selectip), 'arg2':'1' }
 
-        # print(rangeArgs)
+        self.logmsg("def getsingle(): " + str(rangeArgs))
 
         ARString = '''
             AR = [ 
@@ -555,15 +597,17 @@ class GetAutoNet():
 
     # Get the largest range of IP's off the list.
     def getrange(self, brief = 0):
+        self.logmsg("def getrange(self, brief = 0): ")
         rangelst = []
         crange = []
 
         # Test Logic
-        # startip="0.0.0.0"
-        # soctets=re.split(r'(\.|/)', startip)[-1]
-        # print("startip: ", re.split(r'(\.|/)', startip)[-1])
-        # print("Test IP: ", re.split(r'(\.|/)', "1.2.3.4")[-1])
-        # print ("brief: ", brief)
+        self.logmsg("Test (Baseline) Logic: ")
+        startip="0.0.0.0"
+        soctets=re.split(r'(\.|/)', startip)[-1]
+        self.logmsg("startip: " + re.split(r'(\.|/)', startip)[-1])
+        self.logmsg("Test IP: " + re.split(r'(\.|/)', "1.2.3.4")[-1])
+        self.logmsg("brief: " + str(brief))
     
         rangestart=0
         rangeend=0
@@ -572,9 +616,9 @@ class GetAutoNet():
         network = "".join(re.split(r'(\.|/)', self.network_address)[0:-2])
 
         # Check if a valid dnschklst exists.
-        # print("self.dnschklst: ", self.dnschklst)
+        self.logmsg("self.dnschklst: " + str(self.dnschklst))
         if not self.dnschklst:
-            print("ERROR: self.dnschklst was empty.  This either indicates that no IP's were available on this network or a different problem existed further in the code.  Please check your input parameters and retry. ")
+            self.logmsg("ERROR: self.dnschklst was empty.  This either indicates that no IP's were available on this network or a different problem existed further in the code.  Please check your input parameters and retry. \n")
             sys.exit(1)
 
         # Find largest contigous IP set.
@@ -599,7 +643,7 @@ class GetAutoNet():
 
 
             # Save range, if next IP is 2 or greater then we have a range. Save it. 
-            # print ("rangestart: %s, rangeend: %s, hostid: %s, x: %s, len(self.dnschklst): %s, lowerLimit: %s, upperLimit: %s" % ( rangestart, rangeend, hostid, x, len(self.dnschklst), self.lowerLimit, self.upperLimit ) )
+            self.logmsg("rangestart: %s, rangeend: %s, hostid: %s, x: %s, len(self.dnschklst): %s, lowerLimit: %s, upperLimit: %s" % ( rangestart, rangeend, hostid, x, len(self.dnschklst), self.lowerLimit, self.upperLimit ) )
 
             if ( hostid - rangeend ) >= 2 or x == len(self.dnschklst) - 1: 
 
@@ -616,7 +660,7 @@ class GetAutoNet():
 
                     crange = [ rangestart, rangeend ]
                     rangelst.append(crange)
-                    # print ( "Range Found: ", crange )
+                    self.logmsg( "Range Found: " + str(crange) )
 
                     # Start a new range.
                     rangestart = hostid
@@ -627,10 +671,10 @@ class GetAutoNet():
                     rangeend = hostid
 
 
-        # print("rangelst: ", rangelst)
+        self.logmsg("rangelst: " + str(rangelst))
 
         if not rangelst:
-            print("ERROR: rangelst = [] is empty.  No range was found or something else went wrong causing this.")
+            self.logmsg("ERROR: rangelst = [] is empty.  No range was found or something else went wrong causing this. Exiting.")
             sys.exit(1)
 
         # Return largest range found.
@@ -666,14 +710,15 @@ class GetAutoNet():
 
         if brief == 0:
 
-            # print("lrange: ", lrange)
-            # print("lowerLimit: ", self.lowerLimit)
-            # print("upperLimit: ", self.upperLimit)
+            self.logmsg("lrange: " + str(lrange))
+            self.logmsg("lowerLimit: " + str(self.lowerLimit))
+            self.logmsg("upperLimit: " + str(self.upperLimit))
 
-            rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':ranges, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
+            rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':ranges, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0], 'arg11':self.first_mac }
 
-            # print(rangeArgs)
+            self.logmsg("def getrange(self, brief = 0): rangeArgs = " + str(rangeArgs))
 
+            # OpenNebula page didn't have it at the time but apparently, MAC is required in the return value or a default MAC will be provided by OpenNebula.
             ARString = '''
                 AR = [
                     IPAM_MAD = "{arg1}",
@@ -685,7 +730,8 @@ class GetAutoNet():
                     GATEWAY           = "{arg7}",
                     DNS               = "{arg8}",
                     IPAM_ATTR         = "{arg9}",
-                    OTHER_IPAM_ATTR   = "{arg10}"
+                    OTHER_IPAM_ATTR   = "{arg10}",
+                    MAC               = "{arg11}"    
                 ]            
             '''.format(**rangeArgs)
 
@@ -701,7 +747,7 @@ class GetAutoNet():
             # Set the AR STDOUT
             rangeArgs = {'arg1':"GetAutoNet", 'arg2':"IP4", 'arg3':( network + "." + str(rangelst[y][0]) ), 'arg4':self.net_size, 'arg5':( network + ".0" ), 'arg6':self.network_mask, 'arg7':self.gateway, 'arg8':self.dns, 'arg9':str( network + "." + str(rangelst[y][1]) ), 'arg10':list(self.search_domain.split(" "))[0] }
 
-            # print (rangeArgs)
+            self.logmsg("def getrange(self, brief = 0): " + str(rangeArgs))
 
             ARString = '''ADDRESS = [ IP = "{arg3}", SIZE = "{arg4}" ]'''.format(**rangeArgs)
 
@@ -722,41 +768,42 @@ class GetAutoNet():
         else:
             return -1
 
-        # Return the largest range in the set.
+        # Return the largest range in the set via ARString above.
         return 0 
         
 
     # Convert a list to a dictionary.
     def convert(self,lst): 
+        self.logmsg("convert(self,lst): rangeArgs = " + rangeArgs)
         res_dct = {lst[i]: lst[i + 1] for i in range(0, len(lst), 2)} 
         return res_dct
 
 
     # Check if a range of IP's is free to use.
     def freeAddress(self):
-        # print("freeAddress(): ")
-        # print("self.dnschklst[0]: ", self.dnschklst[0])
+        self.logmsg("freeAddress(): ")
+        self.logmsg("self.dnschklst[0]: " + str(self.dnschklst[0]))
         dnschkdict = { }
         
         for x in range(len(self.dnschklst)):
-            # print ("self.dnschklst[%s][0]: %s self.dnschklst[%s][1]: %s" % (x, self.dnschklst[x][0], x, self.dnschklst[x][1]))
+            self.logmsg("self.dnschklst[%s][0]: %s self.dnschklst[%s][1]: %s" % (x, self.dnschklst[x][0], x, self.dnschklst[x][1]))
             dnschkdict.update( { str(self.dnschklst[x][0]) : 1 } )
 
-        # print("dnschkdict: ", dnschkdict)
+        self.logmsg("dnschkdict: " + str(dnschkdict))
       
         # Retrieve the network from the XML IP Address.
         network = "".join(re.split(r'(\.|/)', self.net_ip)[0:-2])
 
-        # print("self.net_size: ", self.net_size)
+        self.logmsg("freeAddress(): self.net_size: " + str(self.net_size))
         for y in range(self.net_size):
             hostid = re.split(r'(\.|/)', self.net_ip)[-1]
-            # print("hostid: ", hostid)
+            self.logmsg("freeAddress(): hostid: " + hostid)
 
             nextip = str( int(hostid) + y )
 
-            # print("Checking: ", network + "." + nextip)
+            self.logmsg("freeAddress(): Checking: " + network + "." + nextip)
             if ( network + "." + hostid ) not in dnschkdict:
-                # print(network + "." + hostid + " not in free IP dictionary.  Therefore, range is not free.")
+                self.logmsg("freeAddress(): " + network + "." + hostid + " not in free IP dictionary.  Therefore, range is not free.")
                 return -1
 
         return 0
@@ -772,60 +819,59 @@ class GetAutoNet():
 
 def main():
 
-    # Print parameters provided
-    # print("This is the name of the script: ", sys.argv[0])
-    # print("Number of arguments: ", len(sys.argv))
-    # print("The arguments are: " , str(sys.argv))
-
+    # Set logger properties
     logger = logging.getLogger(__name__)
+
     ga = GetAutoNet(logger)
     finallst = ga.getAddress()
 
+    # Print parameters provided
+    ga.logmsg("main(): Python Script name: " + sys.argv[0])
+    ga.logmsg("main(): Number of arguments: " + str(len(sys.argv)))
+    ga.logmsg("main(): The arguments are: " + str(sys.argv))
+
     # Print Available IP's
-    # print("Available IP's: ")
-    # for x in range(len(finallst)):
-    #     print("", finallst[x][0] )
+    ga.logmsg("Available IP's: ")
+    for x in range(len(finallst)):
+        ga.logmsg("main(): finallst[" + str(x) + "][0]: " + finallst[x][0] )
 
 
     # Free an IP address.
     if re.search(r'./free_address', sys.argv[0]):
-        # print("Free an IP address. This just returns a 0 to the calling environment indicating that the IP was freed.")
+        ga.logmsg("main(): Free an IP address. This just returns a 0 to the calling environment indicating that the IP was freed.  Callingga.freeAddress()(" + sys.argv[0] + "): ")
         retval=ga.freeAddress()
         return retval
 
     
     # Get a single IP
     if re.search(r'./get_single', sys.argv[0]):
-        # print("Get a single IP via getsingle(): ")
-        # print(ga.getsingle())
+        ga.logmsg("main(): Get a single IP via getsingle()(" + sys.argv[0] + "): ")
         retval=ga.getsingle()
+        ga.logmsg("main(): retval = " + str(retval))
         return retval
 
 
     # Register a single address.
     if re.search(r'./allocate_address', sys.argv[0]):
-        # print("Allocate a single IP address: ")
+        ga.logmsg("main(): Allocate a single IP address.  Calling ga.getrange(2)(" + sys.argv[0] + "): ")
         retval=ga.getrange(2)
-        # print(retval)
-        # print(ga.getrange(2))
+        ga.logmsg("main(): retval = " + str(retval))
         return retval
 
 
     # Register an address range of IP's
     if re.search(r'./register_address_range', sys.argv[0]):
-        # print ("Register an address range of IP's: ")
+        ga.logmsg("main(): Register an address range of IP's.  Calling ga.getrange()(" + sys.argv[0] + "): ")
         retval=ga.getrange()
-        # print(retval)
-        # print(ga.getrange())
+        ga.logmsg("main(): retval = " + str(retval))
         return retval
 
 
     # Get an address range of IP's
     if re.search(r'./get_address', sys.argv[0]):
-        # print ("Get an address range of IP's: ")
+        ga.logmsg("main(): Get an address range of IP's. Calling ga.getrange(1)(" + sys.argv[0] + "): ")
         retval=ga.getrange(1)
-        # print(retval)
-        # print(ga.getrange(1))
+        ga.logmsg("main(): retval = " + str(retval))
         return retval
 
 
@@ -833,13 +879,13 @@ def main():
     if re.search(r'./unregister_address_range', sys.argv[0]):
         # Accept an XML definition and return 0.  Perhaps there are OpenNebula API's that can be called
         # that could determine if any VM's are still using IP's within the range.
-        # print("Release an IP range: ")
+        ga.logmsg("main(): Release / Unregister an IP range (" + sys.argv[0] + ": ")
         return 0
 
 
-
-    # for x in finlst:
-    #     print(" ".join(map(str,x)))
+    ga.logmsg("main(): Printing finlst via: ")
+    for x in finlst:
+        ga.logmsg(" ".join(map(str,x)))
 
 
 if __name__ == "__main__":
