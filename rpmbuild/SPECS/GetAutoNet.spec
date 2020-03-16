@@ -1,6 +1,6 @@
 Name:           GetAutoNet
-Version:        29.02.2020
-Release:        1
+Version:        16.03.2020
+Release:        1.2
 Summary:        GetAutoNet: VLAN IP and IP Range Discovery tool for automatic VM network assignment.
 Group:          Applications/Networking
 License:        GPL
