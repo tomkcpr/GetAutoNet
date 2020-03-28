@@ -268,16 +268,16 @@ class GetAutoNet():
             logging.exception(e)
 
         for a, b in raw.get('scan').items():
-            if str(b['status']['state']) == 'down':
+            if str(b['status']['state']) == 'down' and str(b['status']['reason']) == 'no-response':
                 try:
-                    # print ("ipv4: ", str(b['addresses']['ipv4'] ))
-                    # print ("state:  ", str(b['status']['state']  ))
+                    self.logmsg("ipv4: %s" % (str(b['addresses']['ipv4'] )))
+                    self.logmsg("state:  %s" % (str(b['status']['state']  )))
 
                     self.finlst.append([str(b['addresses']['ipv4']), str(b['status']['state'])])
-                    # print ("a, b: ", str(a), str(b), "\n")
+                    self.logmsg("a, b: %s %s" % (str(a), str(b)))
                 except Exception as listexc:
-                    # print ("Error inserting element: ", a, b)
-                    # print ("Exception Encountered: ", listexc)
+                    self.logmsg("Error inserting element: %s %s" % (a, b))
+                    self.logmsg("Exception Encountered: ", listexc)
                     continue
 
         self.logmsg("self.finlst: %s" % (self.finlst))
